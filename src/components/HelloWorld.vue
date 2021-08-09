@@ -4,14 +4,50 @@
       <div v-for="lattice of line" :class="`bg ${lattice.bg}`" />
     </div>
   </div>
+  <div class="arrow" v-if="isPhone">
+    <div>
+      <div
+        class="top"
+        v-tap="{ keyDown, keyUp, params: { key: Arrow.ArrowUp } }"
+      >
+        <img :src="svg_up" />
+      </div>
+    </div>
+    <div>
+      <div
+        class="left"
+        v-tap="{ keyDown, keyUp, params: { key: Arrow.ArrowLeft } }"
+      >
+        <img :src="svg_left" />
+      </div>
+      <div
+        class="down"
+        v-tap="{ keyDown, keyUp, params: { key: Arrow.ArrowDown } }"
+      >
+        <img :src="svg_down" />
+      </div>
+      <div
+        class="right"
+        v-tap="{ keyDown, keyUp, params: { key: Arrow.ArrowRight } }"
+      >
+        <img :src="svg_right" />
+      </div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
-import { reactive, defineComponent, onMounted, computed } from 'vue'
+import { reactive, defineComponent, onMounted, ref } from 'vue'
+import tap from '../directive/tap'
+import svg_up from '../assets/up.svg'
+import svg_down from '../assets/down.svg'
+import svg_right from '../assets/right.svg'
+import svg_left from '../assets/left.svg'
 
+const isPhone = document.body.clientWidth < 410
 const SIZE = 20
-const BOX_HIGHT = 700 / SIZE
-const BOX_WIDTH = 400 / SIZE
+const BOX_HIGHT = (isPhone ? 500 : 700) / SIZE
+const BOX_WIDTH = (isPhone ? 300 : 400) / SIZE
 const MAX_Y = BOX_HIGHT - 1
 const NORMAL_SPEED = 300
 
@@ -116,6 +152,8 @@ function genSpace(): Attr {
 }
 export default defineComponent({
   name: 'HelloWorld',
+  directives: { tap },
+
   setup: () => {
     const spaceList = reactive(
       Array.from<number>({ length: BOX_HIGHT })
@@ -221,10 +259,10 @@ export default defineComponent({
         }
       }
 
-      intervalHandle(copyShape)
+      moveHandle(copyShape)
       return false
     }
-    const intervalHandle = (copyShape = shape) => {
+    const moveHandle = (copyShape = shape) => {
       for (const [y, x] of shape) {
         spaceList[y][x].bg = ''
       }
@@ -258,66 +296,68 @@ export default defineComponent({
         ;({ shape, bg, name } = genSpace())
       }
     }
+    const keyDown = ({ key }: KeyboardEvent) => {
+      if (!(key in Arrow)) {
+        return
+      }
+      clearInterval(timer)
+      switch (key) {
+        case Arrow.ArrowUp:
+          if (name === 'space') {
+            return
+          }
+          positionHandle(Computed.other)
+          break
+        case Arrow.ArrowLeft:
+          positionHandle(
+            Computed.cut,
+            Grid.X,
+            n => n < 0,
+            (a, b) => a > b
+          )
+          break
+        case Arrow.ArrowDown:
+          downHandle()
+          break
+        case Arrow.ArrowRight:
+          positionHandle(
+            Computed.add,
+            Grid.X,
+            n => n === BOX_WIDTH,
+            (a, b) => a < b
+          )
+          break
+
+        default:
+          break
+      }
+    }
+    const keyUp = ({ key }: KeyboardEvent) => {
+      if (!(key in Arrow)) {
+        return
+      }
+      switch (key) {
+        case Arrow.ArrowUp:
+          break
+        case Arrow.ArrowLeft:
+          break
+        case Arrow.ArrowDown:
+          break
+        case Arrow.ArrowRight:
+          break
+
+        default:
+          break
+      }
+      timer = setInterval(downHandle, NORMAL_SPEED)
+    }
 
     onMounted(() => {
-      window.addEventListener('keydown', ({ key }) => {
-        if (!(key in Arrow)) {
-          return
-        }
-        clearInterval(timer)
-        switch (key) {
-          case Arrow.ArrowUp:
-            if (name === 'space') {
-              return
-            }
-            positionHandle(Computed.other)
-            break
-          case Arrow.ArrowLeft:
-            positionHandle(
-              Computed.cut,
-              Grid.X,
-              n => n < 0,
-              (a, b) => a > b
-            )
-            break
-          case Arrow.ArrowDown:
-            downHandle()
-            break
-          case Arrow.ArrowRight:
-            positionHandle(
-              Computed.add,
-              Grid.X,
-              n => n === BOX_WIDTH,
-              (a, b) => a < b
-            )
-            break
+      window.addEventListener('keydown', keyDown)
 
-          default:
-            break
-        }
-      })
+      window.addEventListener('keyup', keyUp)
 
-      window.addEventListener('keyup', ({ key }) => {
-        if (!(key in Arrow)) {
-          return
-        }
-        switch (key) {
-          case Arrow.ArrowUp:
-            break
-          case Arrow.ArrowLeft:
-            break
-          case Arrow.ArrowDown:
-            break
-          case Arrow.ArrowRight:
-            break
-
-          default:
-            break
-        }
-        timer = setInterval(downHandle, NORMAL_SPEED)
-      })
-
-      intervalHandle()
+      moveHandle()
       timer = setInterval(downHandle, NORMAL_SPEED)
     })
 
@@ -325,7 +365,15 @@ export default defineComponent({
       spaceListComp,
       SIZE,
       BOX_HIGHT,
-      BOX_WIDTH
+      BOX_WIDTH,
+      keyDown,
+      keyUp,
+      Arrow,
+      svg_up,
+      svg_down,
+      svg_right,
+      svg_left,
+      isPhone
     }
   }
 })
@@ -333,9 +381,9 @@ export default defineComponent({
 
 <style>
 .box {
-  height: 700px;
-  width: 400px;
-  margin: 20px;
+  height: v-bind(BOX_HIGHT * SIZE + 'px');
+  width: v-bind(BOX_WIDTH * SIZE + 'px');
+  margin: 10px auto;
   border: 2px solid #444;
   border-top: none;
   position: relative;
@@ -381,5 +429,30 @@ export default defineComponent({
 .bg-ac5e74 {
   background-color: #ac5e74;
   border: 2px solid #ac5e74;
+}
+.arrow {
+  position: relative;
+  margin: 20px auto;
+}
+
+.arrow div {
+  display: flex;
+  justify-content: center;
+}
+
+.top,
+.left,
+.right,
+.down {
+  margin: 6px;
+  height: 46px;
+  width: 46px;
+  border: 1px solid #333;
+  background-color: orange;
+}
+.arrow img {
+  display: block;
+  height: 100%;
+  width: 100%;
 }
 </style>
